@@ -66,6 +66,44 @@ Copie `ts-liftable-axles.dll` para:
 
 Copy `ts-liftable-axles.dll` to `<ETS2>\bin\win_x64\plugins\`.
 
+### How to use
+
+1. **Install** the DLL, start the game and attach a trailer.
+2. Press **`Delete`** to open the plugin window (use `Insert` to release the
+   mouse cursor so you can click it).
+3. **If the window opens very small**, drag its bottom-right corner (or its
+   title bar edges) to resize it until the trailer sections, the axle
+   checkboxes and the status text are fully visible. The size is kept while
+   the game runs.
+4. Expand **Trailer 0** (and any other trailers in the chain). In the
+   **Axle lift** section you will see one entry per axle:
+   - **Checkbox** = that axle is liftable and will rise when you press the
+     game's own "lift trailer axles" key. Check or uncheck to build the set
+     you want — e.g. only axle 1 for a heavy load, only the last axle for
+     another.
+   - **Grey text "Axle N"** = the axle exists but is not liftable on this
+     trailer, so it cannot be selected (this protects the suspension — the
+     game would crash trying to raise it).
+5. Make your selection **with the axles on the ground**. While any axle is up
+   or moving, the checkboxes are locked and the plugin asks you to lower the
+   axles first — changing the selection mid-air is not allowed.
+6. Press the **in-game trailer axle lift key** (the same key as always, no
+   extra keybind needed). Only the axles you checked will rise, with the
+   normal animation and physics.
+7. **Reverse-gear assist** (the "Lift first axle in reverse" checkbox at the
+   top of the window, enabled by default): with every axle on the ground,
+   engaging reverse gear automatically selects only the first liftable axle
+   and raises it — like the real Van der Leest fourth-axle system. Leaving
+   reverse lowers the axle and restores your saved selection. If the axles
+   are already up when you engage reverse, nothing changes.
+8. Your axle selection and the reverse-assist option are saved automatically
+   per trailer position (`settings.ini`), so the next time you attach the
+   same kind of trailer the selection is already there.
+
+**Troubleshooting**: if a trailer shows "No axle data", it may still be
+initializing — give it a second. If it never appears, check `game.log.txt`
+for `[liftable_axles]` messages.
+
 ## Build / Compilar
 
 ```sh
