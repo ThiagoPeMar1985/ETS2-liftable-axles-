@@ -14,29 +14,17 @@ namespace ts_extra_utilities::settings
         constexpr UINT default_keys[ action_count ] = {
             VK_DELETE, // TOGGLE_UI
             VK_INSERT, // TOGGLE_CURSOR
-            0, // STEER_LEFT
-            0, // STEER_RIGHT
-            0, // STEER_CENTER
-            0, // TOGGLE_STEERING_LOCK
         };
 
         // ini keys, kept stable so saved files keep working if display names change
         constexpr const wchar_t* ini_keys[ action_count ] = {
             L"toggle_ui",
             L"toggle_cursor",
-            L"steer_left",
-            L"steer_right",
-            L"steer_center",
-            L"toggle_steering_lock",
         };
 
         constexpr const char* names[ action_count ] = {
             "Toggle window",
             "Toggle cursor",
-            "Steer left",
-            "Steer right",
-            "Center steering",
-            "Lock / unlock steering",
         };
 
         int capturing = -1;
@@ -84,14 +72,6 @@ namespace ts_extra_utilities::settings
             g_settings.axle_masks[ i ] = GetPrivateProfileIntW( L"axle_lift", key.c_str(), -1, path.c_str() );
         }
         g_settings.reverse_lift = GetPrivateProfileIntW( L"axle_lift", L"reverse_lift", 1, path.c_str() ) != 0;
-
-        wchar_t speed[ 32 ] = {};
-        GetPrivateProfileStringW( L"steering", L"speed", L"", speed, 32, path.c_str() );
-        if ( speed[ 0 ] != 0 )
-        {
-            const float value = static_cast< float >( _wtof( speed ) );
-            if ( value > 0.f && value <= 5.f ) g_settings.steering_speed = value;
-        }
     }
 
     void save()
@@ -106,8 +86,6 @@ namespace ts_extra_utilities::settings
         {
             WritePrivateProfileStringW( L"keybinds", ini_keys[ i ], std::to_wstring( g_settings.keys[ i ] ).c_str(), path.c_str() );
         }
-        WritePrivateProfileStringW( L"steering", L"speed", std::to_wstring( g_settings.steering_speed ).c_str(), path.c_str() );
-
         for ( int i = 0; i < trailer_slot_count; ++i )
         {
             const auto key = L"trailer_" + std::to_wstring( i );

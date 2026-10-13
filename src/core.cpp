@@ -187,7 +187,7 @@ namespace ts_extra_utilities
         if ( addr == 0 )
         {
             this->base_ctrl_scan_failed_ = true;
-            this->error( "Could not find base_ctrl, trailer steering is unavailable" );
+            this->error( "Could not find base_ctrl, axle lift is unavailable" );
             return nullptr;
         }
         this->base_ctrl_instance_ptr_address = addr + *reinterpret_cast< int32_t* >( addr + 3 ) + 7;

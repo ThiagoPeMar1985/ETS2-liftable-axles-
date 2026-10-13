@@ -64,14 +64,6 @@ namespace ts_extra_utilities
             ImGui::EndTable();
         }
 
-        ImGui::Separator();
-        ImGui::SliderFloat( "Steering speed", &settings::g_settings.steering_speed, 0.1f, 2.f, "%.2f / s", ImGuiSliderFlags_AlwaysClamp );
-        if ( ImGui::IsItemDeactivatedAfterEdit() ) // once on release, not every drag frame
-        {
-            settings::save();
-        }
-        ImGui::TextDisabled( "Steering keys act on every trailer with steerable wheels." );
-
         ImGui::End();
     }
 }

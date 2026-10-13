@@ -75,8 +75,8 @@ Copy `ts-liftable-axles.dll` to `<ETS2>\bin\win_x64\plugins\`.
    title bar edges) to resize it until the trailer sections, the axle
    checkboxes and the status text are fully visible. The size is kept while
    the game runs.
-4. Expand **Trailer 0** (and any other trailers in the chain). In the
-   **Axle lift** section you will see one entry per axle:
+4. Expand **Trailer 0** (and any other trailers in the chain). You will see
+   one entry per axle:
    - **Checkbox** = that axle is liftable and will rise when you press the
      game's own "lift trailer axles" key. Check or uncheck to build the set
      you want — e.g. only axle 1 for a heavy load, only the last axle for
@@ -116,4 +116,5 @@ The DLL lands in `build/Release/ts-liftable-axles.dll`.
 ## Credits / Créditos
 
 Forked from [ts-extra-utilities](https://github.com/DarioVahva/ts-extra-utilities)
-by Dario Wouters (trailer steering and keybind framework kept), MIT license.
+by Dario Wouters (plugin framework kept; trailer steering lives in a separate
+plugin), MIT license.

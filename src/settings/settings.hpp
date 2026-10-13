@@ -8,10 +8,6 @@ namespace ts_extra_utilities::settings
     {
         TOGGLE_UI,
         TOGGLE_CURSOR,
-        STEER_LEFT,
-        STEER_RIGHT,
-        STEER_CENTER,
-        TOGGLE_STEERING_LOCK,
         COUNT,
     };
 
@@ -21,7 +17,6 @@ namespace ts_extra_utilities::settings
     struct Settings
     {
         UINT keys[ action_count ] = {}; // virtual-key codes, 0 = unbound
-        float steering_speed = 0.5f; // angle units per second while a steer key is held (full lock = 1)
         // Bitmask of trailer axles the lift key may raise, per position in the trailer
         // chain. -1 = not configured, use the trailer's own liftable axles.
         int32_t axle_masks[ trailer_slot_count ];
