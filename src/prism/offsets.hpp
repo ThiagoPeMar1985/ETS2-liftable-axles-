@@ -13,7 +13,7 @@ namespace ts_extra_utilities::prism::offsets
     constexpr uint32_t game_actor_trailer = 0x00C8; // game_trailer_actor_u*, first trailer
     constexpr uint32_t trailer_slave = 0x1060; // game_trailer_actor_u*, next trailer in the chain
 
-    // Axle lift, 1.61. Each trailer owns a lift controller at +0x6A0 (only created
+    // Axle lift, 1.61. Each trailer owns a lift controller (only created
     // when the chassis data marks at least one axle liftable). The controller's init
     // builds a per-axle bitmask at +0x38 from the axle flags; its per-frame update
     // only animates the lift progress of masked axles, and the wheel-position pass
@@ -23,7 +23,9 @@ namespace ts_extra_utilities::prism::offsets
     // non-liftable axle crashes the wheel/suspension update, so the selection is
     // always masked to the original flag set, and nothing is written while the
     // controller state is not "down".
-    constexpr uint32_t trailer_lift_controller = 0x06A0; // axle lift controller
+    // Field moved +0x6A0 -> +0x6C8 in 1.61.1.9s (verified via the trailer init
+    // storing the controller and the set_state wrapper reading it).
+    constexpr uint32_t trailer_lift_controller = 0x06C8; // axle lift controller
     constexpr uint32_t lift_controller_state = 0x003C; // byte: 0 down, 1 lowering, 2 raising, 3 up
     constexpr uint32_t lift_controller_axle_mask = 0x0038; // uint32_t, one bit per axle
     constexpr uint32_t lift_controller_axle_count = 0x0008; // uint32_t

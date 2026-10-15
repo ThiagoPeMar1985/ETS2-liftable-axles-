@@ -16,7 +16,8 @@ namespace ts_extra_utilities
 {
     constexpr uint32_t max_trailers = 20;
 
-    // Console line executor (1.61, VA 0x1401e0c20): runs one command line exactly
+    // Console line executor (1.61 VA 0x1401e0c20, 1.61.1.9s 0x1401e0cc0 — the
+    // pattern below stays unique across both): runs one command line exactly
     // like typing it in the console — the same function the command queue and the
     // console input go through. rcx is a char** holding the line text, edx is the
     // queue context; the game itself passes -1 for direct execution.
@@ -66,7 +67,7 @@ namespace ts_extra_utilities
     // default.
     struct LiftAxles
     {
-        void* controller = nullptr; // trailer+0x6A0, detects a trailer swap/rebuild on change
+        void* controller = nullptr; // trailer+0x6C8, detects a trailer swap/rebuild on change
         void* axle_data = nullptr; // trailer+0x200
         uint8_t* flags = nullptr; // per-axle liftable flags inside axle_data
         uint8_t orig_flags[ max_axles ]{}; // the flags the game set, restored on unload

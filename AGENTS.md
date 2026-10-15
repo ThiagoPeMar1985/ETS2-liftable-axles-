@@ -25,10 +25,31 @@ Trailer chain: `game_actor + 0xC8` = first trailer, `trailer + 0x1060` = next.
 | wheel_dyn + 0x2BC | wheel mask (u32) built once at setup — a secondary consumer effect, NOT the lift gate |
 | trailer + 0x1F8 | chassis model object (refcounted), arg 2 of the controller init |
 | trailer + 0x200 | axle/chassis dyn: +0x5C8 uint8_t* per-axle liftable flags, +0x5D0 u64 count, +0x5E8 u64[] per-axle tokens, +0x678 wheel count |
-| trailer + 0x6A0 | lift controller, see below — only created when a flag byte is nonzero |
+| trailer + 0x6A0 | lift controller (1.61) / **moved to +0x6C8 in 1.61.1.9s**, see below — only created when a flag byte is nonzero |
 | trailer + 0xFB8 | must be non-null for the trailer lift key to work |
 | game_actor + 0x018 | truck physics object (truck + 0x1580 = first trailer) |
 | game_actor + 0x248 | lift bookkeeping byte: bit0 truck axles up, bit1 trailer axles up |
+
+### 1.61.1.9s (exe 53,308,304 bytes, built 2026-10-13) — verified deltas
+
+`.pdata` moved to VA `0x1436e3000` (120,273 entries); re-derive function ranges
+from the PE headers, old addresses are invalid. Only ONE offset the plugin uses
+changed:
+
+- **`trailer + 0x6A0` -> `trailer + 0x6C8`** (lift controller field). Proven by
+  the trailer init `0x14085fca0` (`lea rcx,[r14+0x6c8]` after the ctor call, then
+  `mov rcx,[r14+0x6c8]` + init) and both set_state wrappers `0x1407868b0` /
+  `0x140649840` reading `[trailer+0x6c8]`.
+- Unchanged (verified in code): `game_actor+0xC8`, `+0x248` byte (toggle at
+  `0x1409f6660`), `trailer+0x1060` (self-walk `mov rcx,[rcx+0x1060]` in
+  `0x1409e5cf0` next to `+0x150`), `trailer+0x150`, `+0x1F8`, `+0x200`,
+  `+0xFB8`, `axle_data+0x5C8/+0x5D0` (init `0x140a33f33` iterates them) and the
+  whole controller layout (`+0x08/+0x18/+0x20/+0x38/+0x3C`, states 0-3).
+- New lift-controller VAs: ctor `0x140a33e40`, init `0x140a33eb0` (mask-build
+  loop at `0x140a33f30`), set_state `0x140a34080`, update tail `0x140a34187`
+  (state transitions 1->0 / 2->3 at `0x140a34226`/`0x140a34232`).
+- Console executor pattern still unique, new VA `0x1401e0cc0`.
+- base_ctrl pattern still unique (resolves at file offset `0x5becb3`).
 
 Lift controller (allocated 0x40 bytes, plain pointer field):
 
