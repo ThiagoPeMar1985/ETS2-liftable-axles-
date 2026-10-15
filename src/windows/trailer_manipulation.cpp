@@ -1,18 +1,59 @@
 #include "trailer_manipulation.hpp"
 
 #include <atomic>
+#include <cfloat>
 
 #include "imgui.h"
 
 #include "common/scssdk_telemetry_truck_common_channels.h"
 
 #include "core.hpp"
+#include "memory/memory_utils.hpp"
 #include "prism/offsets.hpp"
 #include "settings/settings.hpp"
 
 namespace ts_extra_utilities
 {
     constexpr uint32_t max_trailers = 20;
+
+    // Console line executor (1.61, VA 0x1401e0c20): runs one command line exactly
+    // like typing it in the console — the same function the command queue and the
+    // console input go through. rcx is a char** holding the line text, edx is the
+    // queue context; the game itself passes -1 for direct execution.
+    using console_exec_fn = int( __fastcall )( char**, int );
+    console_exec_fn* g_console_exec = nullptr;
+    bool console_exec_missing = false;
+
+    bool console_exec( const char* line )
+    {
+        if ( g_console_exec == nullptr && !console_exec_missing )
+        {
+            g_console_exec = memory::get_function_from_pattern< console_exec_fn >(
+                "40 55 41 54 41 55 48 8D AC 24 00 F4 FF FF 48 81 EC 00 0D 00 00 44 8B EA 4C 8B E1" );
+            if ( g_console_exec == nullptr )
+            {
+                console_exec_missing = true;
+                CCore::g_instance->warning( "Console executor not found, trailer covers keybinds are unavailable" );
+            }
+        }
+        if ( g_console_exec == nullptr ) return false;
+
+        auto* text = const_cast< char* >( line );
+        g_console_exec( &text, -1 );
+        return true;
+    }
+
+    // Last g_trailer_cables_mode value we sent; -1 when the plugin has not sent
+    // one yet (or the game state is unknown), which the keybinds treat as closed.
+    int covers_mode = -1;
+
+    void set_covers_mode( const int mode )
+    {
+        if ( console_exec( fmt::format( "g_trailer_cables_mode {}", mode ).c_str() ) )
+        {
+            covers_mode = mode;
+        }
+    }
 
     constexpr uint32_t max_axles = 16; // sane upper bound for the flag count sanity check
 
@@ -351,12 +392,62 @@ namespace ts_extra_utilities
         }
     }
 
+    namespace ui
+    {
+        // On/off pill switch drawn with the draw list (ImGui has no native one).
+        bool toggle_switch( const char* id, bool* v )
+        {
+            const float h = ImGui::GetFrameHeight();
+            const float w = h * 1.9f;
+            ImGui::InvisibleButton( id, ImVec2( w, h ) );
+            const bool changed = ImGui::IsItemClicked();
+            if ( changed ) *v = !*v;
+            auto* dl = ImGui::GetWindowDrawList();
+            const ImVec2 p = ImGui::GetItemRectMin();
+            const float r = h * 0.5f;
+            const ImU32 bg = *v ? IM_COL32( 46, 160, 90, 255 ) : IM_COL32( 92, 94, 102, 255 );
+            dl->AddRectFilled( p, ImVec2( p.x + w, p.y + h ), bg, r );
+            const float kx = *v ? p.x + w - r : p.x + r;
+            dl->AddCircleFilled( ImVec2( kx, p.y + r ), r - 3.5f, IM_COL32( 245, 245, 245, 255 ) );
+            return changed;
+        }
+
+        // Moves the cursor so the next widget of `width` hugs the row's right edge.
+        void right_side( const float width )
+        {
+            ImGui::SameLine( 0.f, 0.f );
+            ImGui::SetCursorPosX( ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - width );
+        }
+
+        void section( const char* text )
+        {
+            ImGui::Spacing();
+            ImGui::PushStyleColor( ImGuiCol_Text, ImVec4( 0.55f, 0.80f, 0.62f, 1.f ) );
+            ImGui::TextUnformatted( text );
+            ImGui::PopStyleColor();
+            ImGui::Separator();
+            ImGui::Spacing();
+        }
+
+        // Shows the bound key; clicking it starts the capture in settings.
+        void keybind_button( const settings::Action action )
+        {
+            const auto text = settings::is_capturing( action )
+                ? std::string( "Pressione uma tecla..." )
+                : settings::key_name( settings::key( action ) );
+            if ( ImGui::Button( fmt::format( "{}##kb{}", text, static_cast< int >( action ) ).c_str(), ImVec2( 150.f, 0.f ) ) )
+            {
+                settings::begin_capture( action );
+            }
+        }
+    }
+
     void CTrailerManipulation::render_trailer_lift( const uint32_t i ) const
     {
         const auto& lift = lift_axles[ i ];
         if ( lift.axle_data == nullptr )
         {
-            ImGui::TextDisabled( "No axle data" );
+            ImGui::TextDisabled( "Sem dados de eixo" );
             return;
         }
 
@@ -364,7 +455,7 @@ namespace ts_extra_utilities
         const auto state = controller != nullptr
             ? prism::offsets::field< uint8_t >( controller, prism::offsets::lift_controller_state )
             : 0;
-        ImGui::Text( "Lift: %s", state != 0 ? "raised" : "down" );
+        ImGui::Text( "Eixos: %s", state != 0 ? "levantados" : "no chao" );
 
         // axles moving or up with a real mask physically occupy the air — the
         // selection must stay put until they are back on the ground; a state
@@ -373,13 +464,12 @@ namespace ts_extra_utilities
         bool locked = state != 0 && lift.applied_mask != 0;
         if ( locked )
         {
-            ImGui::TextWrapped( "Lower the axles to change which ones lift." );
-            ImGui::TextWrapped( "Abaixe os eixos para alterar quais serao levantados." );
+            ImGui::TextDisabled( "Abaixe os eixos para alterar quais serao levantados." );
         }
 
         if ( lift.native_axles == 0 )
         {
-            ImGui::TextDisabled( "No liftable axles on this trailer" );
+            ImGui::TextDisabled( "Nenhum eixo elevavel nesta carreta" );
             return;
         }
 
@@ -391,28 +481,31 @@ namespace ts_extra_utilities
         {
             selection = lift.native_axles & ( 0u - lift.native_axles );
             locked = true;
-            ImGui::TextWrapped( "Reverse engaged: only the first liftable axle is up." );
-            ImGui::TextWrapped( "Re engatada: somente o primeiro eixo elevavel esta levantado." );
+            ImGui::TextDisabled( "Re engatada: somente o primeiro eixo elevavel esta levantado." );
         }
 
         ImGui::BeginDisabled( locked );
         uint32_t next = selection;
+        const float switch_w = ImGui::GetFrameHeight() * 1.9f;
         for ( uint32_t a = 0; a < lift.axle_count; ++a )
         {
             if ( ( lift.native_axles >> a ) & 1 )
             {
                 bool on = ( selection >> a ) & 1;
-                const auto label = fmt::format( "Axle {}##axle", a + 1 );
-                if ( ImGui::Checkbox( label.c_str(), &on ) )
+                ImGui::Text( "Eixo %u", a + 1 );
+                ui::right_side( switch_w );
+                const auto id = fmt::format( "##axle{}", a );
+                if ( ui::toggle_switch( id.c_str(), &on ) )
                 {
                     next = on ? next | ( 1u << a ) : next & ~( 1u << a );
                 }
             }
             else
             {
-                ImGui::TextDisabled( "Axle %u", a + 1 );
+                ImGui::TextDisabled( "Eixo %u", a + 1 );
+                ui::right_side( switch_w );
+                ImGui::TextDisabled( "fixo" );
             }
-            if ( a + 1 < lift.axle_count ) ImGui::SameLine();
         }
         ImGui::EndDisabled();
 
@@ -423,40 +516,101 @@ namespace ts_extra_utilities
         }
     }
 
-    void CTrailerManipulation::render()
+    void CTrailerManipulation::covers_open()
     {
-        ImGui::Begin( "Liftable Axles" );
+        // mode 0 = no cables anywhere: every cover in the chain opens at once
+        set_covers_mode( 0 );
+    }
 
-        if ( !this->valid_ )
+    void CTrailerManipulation::covers_close()
+    {
+        // g_trailer_cables_mode: 0 = no cables (all covers open), 1 = first
+        // trailer only, 2+ = the whole chain. Each press closes one more
+        // trailer; when everything is already closed the value stays put.
+        const int cap = trailer_count < 2 ? static_cast< int >( trailer_count ) : 2;
+        if ( covers_mode < 0 || covers_mode >= cap )
         {
-            ImGui::TextWrapped( "Axle lift is unavailable for this game version, see the game log." );
-        }
-        else if ( trailer_count == 0 )
-        {
-            ImGui::Text( "No trailers found" );
+            set_covers_mode( cap ); // unknown -> all closed; already closed -> reaffirm
         }
         else
         {
-            ImGui::Text( "%u trailer%s found", trailer_count, trailer_count > 1 ? "s" : "" );
-            bool reverse_lift = settings::g_settings.reverse_lift;
-            if ( ImGui::Checkbox( "Lift first axle in reverse / Erguer 1o eixo na re", &reverse_lift ) )
-            {
-                settings::g_settings.reverse_lift = reverse_lift;
-                settings::save();
-            }
-            ImGui::Spacing();
+            set_covers_mode( covers_mode + 1 );
+        }
+    }
+
+    void CTrailerManipulation::render()
+    {
+        ImGui::SetNextWindowSizeConstraints( ImVec2( 600.f, 300.f ), ImVec2( FLT_MAX, FLT_MAX ) );
+        ImGui::SetNextWindowSize( ImVec2( 640.f, 420.f ), ImGuiCond_FirstUseEver );
+
+        ImGui::PushStyleVar( ImGuiStyleVar_WindowPadding, ImVec2( 16.f, 12.f ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_ItemSpacing, ImVec2( 10.f, 8.f ) );
+        ImGui::PushStyleVar( ImGuiStyleVar_FrameRounding, 4.f );
+        ImGui::PushStyleColor( ImGuiCol_WindowBg, ImVec4( 0.09f, 0.10f, 0.12f, 0.98f ) );
+        ImGui::PushStyleColor( ImGuiCol_Button, ImVec4( 0.20f, 0.22f, 0.26f, 1.f ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonHovered, ImVec4( 0.28f, 0.55f, 0.36f, 1.f ) );
+        ImGui::PushStyleColor( ImGuiCol_ButtonActive, ImVec4( 0.20f, 0.65f, 0.40f, 1.f ) );
+        ImGui::PushStyleColor( ImGuiCol_Header, ImVec4( 0.16f, 0.18f, 0.21f, 1.f ) );
+        ImGui::PushStyleColor( ImGuiCol_HeaderHovered, ImVec4( 0.22f, 0.24f, 0.28f, 1.f ) );
+        ImGui::PushStyleColor( ImGuiCol_Separator, ImVec4( 0.28f, 0.30f, 0.34f, 1.f ) );
+
+        ImGui::Begin( "Trailer System" );
+
+        // covers section — always visible so the keybinds are reachable even
+        // with no trailer attached
+        ui::section( "CARROCERIA / LONAS" );
+
+        ImGui::TextUnformatted( "Abrir carroceria" );
+        ui::right_side( 150.f );
+        ui::keybind_button( settings::Action::COVERS_NEXT );
+
+        ImGui::TextUnformatted( "Fechar carroceria" );
+        ui::right_side( 150.f );
+        ui::keybind_button( settings::Action::COVERS_TOGGLE );
+
+        if ( covers_mode >= 0 )
+        {
+            ImGui::TextDisabled( "Modo dos cabos: %d", covers_mode );
+        }
+
+        ui::section( "EIXOS / LIFT" );
+
+        ImGui::TextUnformatted( "Erguer 1o eixo na re" );
+        ui::right_side( ImGui::GetFrameHeight() * 1.9f );
+        bool reverse_lift = settings::g_settings.reverse_lift;
+        if ( ui::toggle_switch( "##reverse_lift", &reverse_lift ) )
+        {
+            settings::g_settings.reverse_lift = reverse_lift;
+            settings::save();
+        }
+
+        ImGui::Spacing();
+        if ( !this->valid_ )
+        {
+            ImGui::TextDisabled( "Lift indisponivel nesta versao do jogo, veja o game log." );
+        }
+        else if ( trailer_count == 0 )
+        {
+            ImGui::TextDisabled( "Nenhuma carreta conectada" );
+        }
+        else
+        {
             for ( uint32_t i = 0; i < trailer_count; ++i )
             {
-                const auto trailer_name = fmt::format( "Trailer {}", i );
+                const auto trailer_name = fmt::format( "Carreta {}", i + 1 );
                 ImGui::PushID( trailer_name.c_str() );
                 if ( ImGui::CollapsingHeader( trailer_name.c_str(), ImGuiTreeNodeFlags_DefaultOpen ) )
                 {
+                    ImGui::Indent( 8.f );
                     this->render_trailer_lift( i );
+                    ImGui::Unindent( 8.f );
                 }
                 ImGui::PopID();
             }
         }
 
         ImGui::End();
+        ImGui::PopStyleColor( 7 );
+        ImGui::PopStyleVar( 3 );
     }
 }

@@ -103,3 +103,41 @@ Creating a controller for trailers with zero liftable axles was implemented
 (game alloc `0x141d1e158` + ctor `0x140a33370` + field-store `0x140879df0` +
 init `0x140a333e0`, chassis object at trailer+0x1F8) and worked, but was
 removed: with no natively liftable axle there is nothing safe to select.
+
+## Trailer covers (g_trailer_cables_mode)
+
+Cover mods (Librelato sider, graneleiro, etc.) rig door/tarp/curtain animations
+to the native `g_trailer_cables_mode` cvar, so typing
+`g_trailer_cables_mode N` in the console opens/closes them (values are
+mod-defined; typically 0 = all open, 1 = first trailer closed, 2+ = all closed).
+
+Decoupling the cover from the ropes was tried and does NOT work on the tested
+mods: calling `0x140876ac0` (named-node flag setter for the trlr_cables nodes:
+node[0x142d4df98].bit = !flag, node[0x142d4dfa0].bit = flag, via lookup
+`0x1406260e0` on `obj+0x120`/`+0x190`) and calling the vehicle connector-state
+setter `0x1408735e0` (writes `vehicle+0xE65`, calls attach/detach virtuals on
+the `+0xE70` object list) both run without error but produce no cover movement —
+the cover pose follows the rope objects themselves (trailer+0x1080 list),
+which only `g_trailer_cables_mode` create/destroy.
+
+Console line executor (1.61, ETS2): `0x1401e0c20`
+`execute_line(char** text, int queue_ctx)` — rcx is a `char**` whose first
+qword is the command text (only +0 is read), edx is the queue context and the
+game passes -1 for direct execution (call site `0x1404267fa`). The command
+queue (`exec` handler `0x1401cc3a0` -> stream exec `0x1401e09f0`) funnels into
+the same function; `[cmd] '%s' - unknown command` is logged inside it at
+`0x1401e1040`. Plugin calls it with `"g_trailer_cables_mode N"` — identical to
+typing in the console, no separate apply needed.
+
+Pattern (unique in 1.61):
+`40 55 41 54 41 55 48 8D AC 24 00 F4 FF FF 48 81 EC 00 0D 00 00 44 8B EA 4C 8B E1`
+
+Other cable internals (noted): rope rebuild `0x140876770`, per-chain build
+`0x1408758b0`, per-trailer `0x140875930`, mode apply `0x140875830` (r9d=mode,
+5 = read cvar via `0x1401cbd70`). Cvar descriptors live in a static array at
+`0x142d475c0` (stride 0x140, name at +0x08, value string ~+0x28).
+
+Keybinds: `covers_toggle` cycles `0 -> 1 -> ... -> min(trailer_count,2) -> 0`
+(open all at once, then close one trailer per press) and `covers_next` jumps
+straight to mode 0 (open all), in settings.ini `[keybinds]`. The plugin tracks
+the last mode it sent; a manual console change desyncs it by one press.

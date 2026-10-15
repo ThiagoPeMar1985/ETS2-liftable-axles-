@@ -14,17 +14,23 @@ namespace ts_extra_utilities::settings
         constexpr UINT default_keys[ action_count ] = {
             VK_DELETE, // TOGGLE_UI
             VK_INSERT, // TOGGLE_CURSOR
+            0, // COVERS_TOGGLE
+            0, // COVERS_NEXT
         };
 
         // ini keys, kept stable so saved files keep working if display names change
         constexpr const wchar_t* ini_keys[ action_count ] = {
             L"toggle_ui",
             L"toggle_cursor",
+            L"covers_toggle",
+            L"covers_next",
         };
 
         constexpr const char* names[ action_count ] = {
             "Toggle window",
             "Toggle cursor",
+            "Fechar carroceria",
+            "Abrir carroceria",
         };
 
         int capturing = -1;

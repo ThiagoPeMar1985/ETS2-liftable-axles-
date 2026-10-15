@@ -160,6 +160,19 @@ namespace ts_extra_utilities
                 if ( !repeat ) toggle_ui();
                 return true;
             }
+            if ( this->trailer_manipulation_ != nullptr )
+            {
+                if ( vk == settings::key( settings::Action::COVERS_TOGGLE ) )
+                {
+                    if ( !repeat ) this->trailer_manipulation_->covers_close();
+                    return true;
+                }
+                if ( vk == settings::key( settings::Action::COVERS_NEXT ) )
+                {
+                    if ( !repeat ) this->trailer_manipulation_->covers_open();
+                    return true;
+                }
+            }
         }
         else if ( umsg == WM_MOUSEMOVE )
         {

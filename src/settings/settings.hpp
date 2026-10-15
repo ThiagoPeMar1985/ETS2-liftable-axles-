@@ -8,6 +8,8 @@ namespace ts_extra_utilities::settings
     {
         TOGGLE_UI,
         TOGGLE_CURSOR,
+        COVERS_TOGGLE,
+        COVERS_NEXT,
         COUNT,
     };
 
